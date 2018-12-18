@@ -126,9 +126,53 @@ let rec annotate e _params _bound=
         | LambdaSimple(_vars , _body) -> LambdaSimple'(_vars , (annotate _body _vars ((create_bound_env _params) @ (List.map extend_bound_vars _bound))))
         | LambdaOpt(_vars , _opt , _body) -> LambdaOpt'(_vars , _opt , (annotate _body (_vars @ [_opt]) ((create_bound_env _params) @ (List.map extend_bound_vars _bound))));;
                                                             
-let annotate_lexical_addresses e = (annotate e [] []);;                                                            
+let annotate_lexical_addresses e = (annotate e [] []);;
 
-let annotate_tail_calls e = raise X_not_yet_implemented;;
+let get_last lst = 
+  let reversed = (List.rev lst) in
+  let last = (List.hd reversed) in
+  let rest = (List.rev (List.tl reversed)) in
+  (last, rest);;
+
+let rec aux_param_annotate_tail_calls e in_tp = 
+  match e with
+        | Const'(c) -> Const'(c)
+        | Var'(var) -> Var'(var)
+        | If' (test ,conseq , alt) -> If' ((aux_param_annotate_tail_calls test false) ,(aux_param_annotate_tail_calls conseq in_tp) ,(aux_param_annotate_tail_calls alt in_tp))
+        | Seq' (exps) ->  Seq'(sequence_handler exps in_tp) (*CHANGE seqOrHandler *)
+        | Set' (_var, _val) -> Set' ((aux_param_annotate_tail_calls _var false), (aux_param_annotate_tail_calls _val false))
+        | Def' (_var, _val) -> Def' ((aux_param_annotate_tail_calls _var false), (aux_param_annotate_tail_calls _val false))
+        | Or' (exps) -> Or' (or_handler exps in_tp)
+        | LambdaSimple' (vars, body) -> LambdaSimple' (vars, (aux_param_annotate_tail_calls body true))
+        | LambdaOpt' (vars, opt ,body) -> LambdaOpt' (vars, opt, (aux_param_annotate_tail_calls body true))
+        | Applic' (e, args) -> (app_handler e args in_tp)(*CHANGE applicHandler*)
+        | _ -> raise X_syntax_error
+
+  and sequence_handler exps in_tp = 
+    let (l, r) = get_last exps in
+        (List.map hp r) @ [(aux_param_annotate_tail_calls l in_tp)]
+
+  and or_handler exps in_tp = 
+    let (l, r) = get_last exps in
+        (List.map hp r) @ [(aux_param_annotate_tail_calls l in_tp)]
+
+  and app_handler e args in_tp =
+   match in_tp with
+        | true -> ApplicTP'((hp e),(List.map hp args))
+        | false -> Applic'((hp e),(List.map hp args))
+
+   and hp exp = aux_param_annotate_tail_calls exp false;;
+
+let annotate_tail_calls e = aux_param_annotate_tail_calls e false;;
+
+
+
+
+
+
+
+
+
 
 let box_set e = raise X_not_yet_implemented;;
 
