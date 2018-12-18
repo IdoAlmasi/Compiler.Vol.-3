@@ -78,18 +78,19 @@ let create_bound_env _vars=
 let extend_bound_vars _bound_vars =
     let rec helper _vars=
         match _vars with
-            |Var'(VarBound(_var , _majorIdx , _minorIdx)) -> Var'(VarBound(_var , (_majorIdx+1) , _minorIdx)) in
+            |Var'(VarBound(_var , _majorIdx , _minorIdx)) -> Var'(VarBound(_var , (_majorIdx+1) , _minorIdx))
+            | _ ->raise X_syntax_error in
         (helper _bound_vars);;
             
 let get_var_param _var _params = 
-    let rec helper _params = 
+    let rec helper _params _index = 
         match _params with
         | [] -> Const'(Sexpr(Nil))
-        | Var'(VarParam(_var_name , _index)) :: cdr ->
-            if((compare _var _var_name) == 0)
-                then Var'(VarParam(_var_name , _index))
-                else (helper cdr) in
-        (helper _params);;
+        |  car :: cdr ->
+            if((compare car _var) == 0)
+                then Var'(VarParam(_var , _index))
+                else (helper cdr (_index+1)) in
+        (helper _params 0);;
         
 let get_var_bound _var _bound =
     let rec helper _bounds = 
@@ -98,7 +99,8 @@ let get_var_bound _var _bound =
         | Var'(VarBound(_var_name , _majorIdx , _minorIdx)) :: cdr ->
             if((compare _var _var_name) == 0)
                 then Var'(VarBound(_var_name , _majorIdx , _minorIdx))
-                else (helper cdr) in
+                else (helper cdr) 
+        | _ -> raise X_syntax_error in
         (helper _bound);;
     
 let annotate_var _var _params _bound = 
@@ -122,9 +124,9 @@ let rec annotate e _params _bound=
         | Or(_l) -> Or'(List.map annotate_expr _l);
         | Applic(_e , _args) -> Applic'((annotate_expr _e) , (List.map annotate_expr _args))
         | LambdaSimple(_vars , _body) -> LambdaSimple'(_vars , (annotate _body _vars ((create_bound_env _params) @ (List.map extend_bound_vars _bound))))
-        | LambdaOpt(_vars , _opt , _body) -> LambdaOpt'(_vars , _opt , (annotate _body (_vars @ [opt]) ((create_bound_env _params) @ (List.map extend_bound_vars _bound))));;
+        | LambdaOpt(_vars , _opt , _body) -> LambdaOpt'(_vars , _opt , (annotate _body (_vars @ [_opt]) ((create_bound_env _params) @ (List.map extend_bound_vars _bound))));;
                                                             
-let annotate_lexical_addresses e =(annotate e , [] , []);;                                                            
+let annotate_lexical_addresses e = (annotate e [] []);;                                                            
 
 let annotate_tail_calls e = raise X_not_yet_implemented;;
 
